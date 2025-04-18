@@ -4,12 +4,14 @@ from telegram.ext import CommandHandler, Updater
 
 # Получаем токен из переменных окружения
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
-
 bot = Bot(token=TOKEN)
+
+# Создаём объект Updater
 updater = Updater(token=TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
 # ==== Работа с подписчиками ====
+subscribers = set()
 
 # Загружаем список подписчиков из файла
 def load_subscribers():
@@ -23,7 +25,6 @@ def save_subscriber(chat_id):
     with open("subscribers.txt", "a") as file:
         file.write(f"{chat_id}\n")
 
-# Храним подписчиков в памяти
 subscribers = load_subscribers()
 
 # ==== Команды ====
@@ -41,8 +42,14 @@ def start(update, context):
 start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)
 
-# ==== Запуск бота ====
+# ==== Webhook (это нужно для Render) ====
 
-updater.start_polling()
+updater.start_webhook(
+    listen="0.0.0.0",  # Слушаем на всех интерфейсах
+    port=int(os.environ.get('PORT', 5000)),  # Порт для Render (по умолчанию 5000)
+    url_path=TOKEN,  # Токен будет частью URL
+    webhook_url=f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/{TOKEN}",  # URL Webhook для Render
+)
+
 updater.idle()
 
