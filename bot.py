@@ -42,4 +42,23 @@ dispatcher.add_handler(start_handler)
 # Запуск бота
 updater.start_polling()
 updater.idle()
+# Команда /send для рассылки
+def send(update: Update, context: CallbackContext):
+    if context.args:
+        message = ' '.join(context.args)
+        try:
+            with open(USERS_FILE, "r") as file:
+                users = json.load(file)
+            for user_id in users:
+                context.bot.send_message(chat_id=user_id, text=message)
+            update.message.reply_text("Рассылка отправлена ✅")
+        except Exception as e:
+            update.message.reply_text(f"Ошибка при рассылке: {e}")
+    else:
+        update.message.reply_text("Напиши сообщение после команды, например:\n/send Привет всем!")
+
+# Добавляем обработчик рассылки
+send_handler = CommandHandler('send', send)
+dispatcher.add_handler(send_handler)
+
 
