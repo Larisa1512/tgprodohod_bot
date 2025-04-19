@@ -1,55 +1,45 @@
 import os
-from telegram import Bot
-from telegram.ext import CommandHandler, Updater
+import json
+from telegram import Bot, Update
+from telegram.ext import CommandHandler, Updater, CallbackContext
 
 # Получаем токен из переменных окружения
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
-bot = Bot(token=TOKEN)
 
-# Создаём объект Updater
+bot = Bot(token=TOKEN)
 updater = Updater(token=TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
-# ==== Работа с подписчиками ====
-subscribers = set()
+# Файл, где будем хранить ID пользователей
+USERS_FILE = "users.json"
 
-# Загружаем список подписчиков из файла
-def load_subscribers():
-    if os.path.exists("subscribers.txt"):
-        with open("subscribers.txt", "r") as file:
-            return set(int(line.strip()) for line in file.readlines())
-    return set()
+# Функция: сохранить ID пользователя
+def save_user(user_id):
+    try:
+        if os.path.exists(USERS_FILE):
+            with open(USERS_FILE, "r") as file:
+                users = json.load(file)
+        else:
+            users = []
 
-# Сохраняем нового подписчика в файл
-def save_subscriber(chat_id):
-    with open("subscribers.txt", "a") as file:
-        file.write(f"{chat_id}\n")
+        if user_id not in users:
+            users.append(user_id)
+            with open(USERS_FILE, "w") as file:
+                json.dump(users, file)
+    except Exception as e:
+        print(f"Ошибка при сохранении пользователя: {e}")
 
-subscribers = load_subscribers()
+# Команда /start
+def start(update: Update, context: CallbackContext):
+    user_id = update.effective_chat.id
+    save_user(user_id)
+    context.bot.send_message(chat_id=user_id, text="Вы подписались на рассылку ✅")
 
-# ==== Команды ====
-
-# /start — добавляет пользователя в список
-def start(update, context):
-    chat_id = update.effective_chat.id
-    if chat_id not in subscribers:
-        subscribers.add(chat_id)
-        save_subscriber(chat_id)
-        context.bot.send_message(chat_id=chat_id, text="✅ Вы подписались на рассылку!")
-    else:
-        context.bot.send_message(chat_id=chat_id, text="Вы уже подписаны 😉")
-
+# Добавляем обработчик команды
 start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)
 
-# ==== Webhook (это нужно для Render) ====
-
-updater.start_webhook(
-    listen="0.0.0.0",  # Слушаем на всех интерфейсах
-    port=int(os.environ.get('PORT', 5000)),  # Порт для Render (по умолчанию 5000)
-    url_path=TOKEN,  # Токен будет частью URL
-    webhook_url=f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/{TOKEN}",  # URL Webhook для Render
-)
-
+# Запуск бота
+updater.start_polling()
 updater.idle()
 
